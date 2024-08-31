@@ -84,6 +84,17 @@ def get_course_availability(driver, course):
         logging.error(f"Error checking availability for {course}: {str(e)}")
         return []
 
+def setup_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver.set_window_size(800, 1080)
+    return driver
+
 def perform_web_task():
     logging.info("Starting web task...")
     
@@ -100,91 +111,72 @@ def perform_web_task():
 
     logging.info(f"Checking availability for courses: {courses}")
     
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = setup_driver()
     
-    try:
-        logging.info("Creating Chrome WebDriver...")
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.set_window_size(800, 1080)
-        logging.info("Chrome WebDriver created successfully.")
+    load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
+    
+    continue_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
+    scroll_to_element(driver, continue_button)
+    continue_button.click()
+    logging.info("Clicked the Continue button.")
+
+    term_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, f"//input[@name='radterm' and @data-term='{term}']")))
+    scroll_to_element(driver, term_button)
+    term_button.click()
+    logging.info(f"Selected term: {term}")
+
+    time.sleep(2)  # Wait for the page to update
+
+    for course in courses:
+        logging.info(f"Entering course: {course}")
         
-        load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
+        course_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "code_number")))
+        scroll_to_element(driver, course_input)
+        course_input.clear()
+        course_input.send_keys(course)
         
-        continue_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
-        scroll_to_element(driver, continue_button)
-        continue_button.click()
-        logging.info("Clicked the Continue button.")
+        select_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "addCourseButton")))
+        scroll_to_element(driver, select_button)
+        select_button.click()
+        
+        logging.info(f"Selected course: {course}")
+        time.sleep(2)  # Wait for the course to be added
 
-        term_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, f"//input[@name='radterm' and @data-term='{term}']")))
-        scroll_to_element(driver, term_button)
-        term_button.click()
-        logging.info(f"Selected term: {term}")
+    logging.info("All courses entered and selected.")
 
-        time.sleep(2)  # Wait for the page to update
+    generate_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "do_search")))
+    scroll_to_element(driver, generate_button)
+    generate_button.click()
+    logging.info("Clicked 'Generate Schedules' button.")
 
-        for course in courses:
-            logging.info(f"Entering course: {course}")
-            
-            course_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "code_number")))
-            scroll_to_element(driver, course_input)
-            course_input.clear()
-            course_input.send_keys(course)
-            
-            select_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "addCourseButton")))
-            scroll_to_element(driver, select_button)
-            select_button.click()
-            
-            logging.info(f"Selected course: {course}")
-            time.sleep(2)  # Wait for the course to be added
+    time.sleep(10)  # Wait for the schedules to be generated
 
-        logging.info("All courses entered and selected.")
-
-        generate_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "do_search")))
-        scroll_to_element(driver, generate_button)
-        generate_button.click()
-        logging.info("Clicked 'Generate Schedules' button.")
-
-        time.sleep(10)  # Wait for the schedules to be generated
-
-        logging.info("Checking course availability...")
-        available_courses = {}
-        for course in courses:
-            available_sections = get_course_availability(driver, course)
-            if available_sections:
-                available_courses[course] = available_sections
-                logging.info(f"Course {course} is available:")
-                for crn, availability_type in available_sections:
-                    logging.info(f"  CRN: {crn}, Availability: {availability_type}")
-            else:
-                logging.info(f"Course {course} is not available")
-
-        if available_courses:
-            notification_title = "Course Availability Alert"
-            notification_body = "The following courses are available:\n"
-            for course, sections in available_courses.items():
-                notification_body += f"{course}:\n"
-                for crn, availability_type in sections:
-                    notification_body += f"  CRN: {crn}, Availability: {availability_type}\n"
-            send_notification(notification_title, notification_body)
+    logging.info("Checking course availability...")
+    available_courses = {}
+    for course in courses:
+        available_sections = get_course_availability(driver, course)
+        if available_sections:
+            available_courses[course] = available_sections
+            logging.info(f"Course {course} is available:")
+            for crn, availability_type in available_sections:
+                logging.info(f"  CRN: {crn}, Availability: {availability_type}")
         else:
-            logging.info("No courses are currently available.")
+            logging.info(f"Course {course} is not available")
 
-        logging.info("All courses have been checked for availability.")
+    if available_courses:
+        notification_title = "Course Availability Alert"
+        notification_body = "The following courses are available:\n"
+        for course, sections in available_courses.items():
+            notification_body += f"{course}:\n"
+            for crn, availability_type in sections:
+                notification_body += f"  CRN: {crn}, Availability: {availability_type}\n"
+        send_notification(notification_title, notification_body)
+    else:
+        logging.info("No courses are currently available.")
 
-    except RequestException as e:
-        logging.error(f"Network error occurred: {str(e)}")
-    except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
-        send_notification("Course Check Error", f"An error occurred while checking course availability: {str(e)}")
-    finally:
-        if 'driver' in locals():
-            logging.info("Closing browser...")
-            driver.quit()
-            logging.info("Browser closed.")
+    logging.info("All courses have been checked for availability.")
+
+    driver.quit()
 
 if __name__ == "__main__":
     perform_web_task()
