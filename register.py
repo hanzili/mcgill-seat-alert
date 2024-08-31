@@ -55,32 +55,41 @@ def scroll_to_element(driver, element):
 
 def get_course_availability(driver, course):
     try:
-        course_box = WebDriverWait(driver, 10).until(
+        logging.info(f"Searching for course: {course}")
+        wait = WebDriverWait(driver, 20)  # Increase wait time to 20 seconds
+        course_box = wait.until(
             EC.presence_of_element_located((By.XPATH, f"//div[contains(@class, 'course_box') and contains(., '{course}')]"))
         )
+        logging.info(f"Found course box for: {course}")
         scroll_to_element(driver, course_box)
         
         sections = course_box.find_elements(By.XPATH, ".//div[contains(@class, 'selection_row')]")
+        logging.info(f"Found {len(sections)} sections for course: {course}")
         
         available_sections = []
         
         for section in sections:
-            if "Lec" in section.text:
-                crn = section.find_element(By.XPATH, ".//span[@class='crn_value']").text
-                
-                seats_element = section.find_element(By.XPATH, ".//span[contains(@class, 'leftnclear') and contains(., 'Seats:')]")
-                if "Full" not in seats_element.text:
-                    available_sections.append((crn, "Open seats"))
-                    continue
-                
-                waitlist_element = section.find_element(By.XPATH, ".//span[contains(@class, 'legend_waitlist')]")
-                if "None" not in waitlist_element.text:
-                    available_sections.append((crn, "Waitlist"))
+            try:
+                if "Lec" in section.text:
+                    crn = section.find_element(By.XPATH, ".//span[@class='crn_value']").text
+                    
+                    seats_element = section.find_element(By.XPATH, ".//span[contains(@class, 'leftnclear') and contains(., 'Seats:')]")
+                    if "Full" not in seats_element.text:
+                        available_sections.append((crn, "Open seats"))
+                        continue
+                    
+                    waitlist_element = section.find_element(By.XPATH, ".//span[contains(@class, 'legend_waitlist')]")
+                    if "None" not in waitlist_element.text:
+                        available_sections.append((crn, "Waitlist"))
+            except NoSuchElementException as e:
+                logging.warning(f"Error processing section in {course}: {str(e)}")
         
         return available_sections
+    except TimeoutException:
+        logging.error(f"Timeout while searching for course: {course}")
     except Exception as e:
         logging.error(f"Error checking availability for {course}: {str(e)}")
-        return []
+    return []
 
 def setup_driver():
     chrome_options = Options()
@@ -109,70 +118,73 @@ def perform_web_task():
     
     driver = setup_driver()
     
-    load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
-    
-    continue_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
-    scroll_to_element(driver, continue_button)
-    continue_button.click()
-    logging.info("Clicked the Continue button.")
-
-    term_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, f"//input[@name='radterm' and @data-term='{term}']")))
-    scroll_to_element(driver, term_button)
-    term_button.click()
-    logging.info(f"Selected term: {term}")
-
-    time.sleep(2)  # Wait for the page to update
-
-    for course in courses:
-        logging.info(f"Entering course: {course}")
+    try:
+        load_webpage(driver, "https://vsb.mcgill.ca/vsb/criteria.jsp?access=0&lang=en&tip=1&page=results&scratch=0&term=0&sort=none&filters=iiiiiiiii&bbs=&ds=&cams=Distance_Downtown_Macdonald_Off-Campus&locs=any&isrts=&course_0_0=&sa_0_0=&cs_0_0=--+All+--&cpn_0_0=&csn_0_0=&ca_0_0=&dropdown_0_0=al&ig_0_0=0&rq_0_0=")
         
-        course_input = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "code_number")))
-        scroll_to_element(driver, course_input)
-        course_input.clear()
-        course_input.send_keys(course)
-        
-        select_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "addCourseButton")))
-        scroll_to_element(driver, select_button)
-        select_button.click()
-        
-        logging.info(f"Selected course: {course}")
-        time.sleep(2)  # Wait for the course to be added
+        continue_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, "//input[@type='button' and @value='Continue']")))
+        scroll_to_element(driver, continue_button)
+        continue_button.click()
+        logging.info("Clicked the Continue button.")
 
-    logging.info("All courses entered and selected.")
+        term_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.XPATH, f"//input[@name='radterm' and @data-term='{term}']")))
+        scroll_to_element(driver, term_button)
+        term_button.click()
+        logging.info(f"Selected term: {term}")
 
-    generate_button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "do_search")))
-    scroll_to_element(driver, generate_button)
-    generate_button.click()
-    logging.info("Clicked 'Generate Schedules' button.")
+        time.sleep(5)  # Increase wait time after selecting term
 
-    time.sleep(10)  # Wait for the schedules to be generated
+        for course in courses:
+            logging.info(f"Entering course: {course}")
+            
+            course_input = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.ID, "code_number")))
+            scroll_to_element(driver, course_input)
+            course_input.clear()
+            course_input.send_keys(course)
+            
+            select_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "addCourseButton")))
+            scroll_to_element(driver, select_button)
+            select_button.click()
+            
+            logging.info(f"Selected course: {course}")
+            time.sleep(3)  # Increase wait time after adding each course
 
-    logging.info("Checking course availability...")
-    available_courses = {}
-    for course in courses:
-        available_sections = get_course_availability(driver, course)
-        if available_sections:
-            available_courses[course] = available_sections
-            logging.info(f"Course {course} is available:")
-            for crn, availability_type in available_sections:
-                logging.info(f"  CRN: {crn}, Availability: {availability_type}")
+        logging.info("All courses entered and selected.")
+
+        generate_button = WebDriverWait(driver, 20).until(EC.element_to_be_clickable((By.ID, "do_search")))
+        scroll_to_element(driver, generate_button)
+        generate_button.click()
+        logging.info("Clicked 'Generate Schedules' button.")
+
+        time.sleep(15)  # Increase wait time for schedules to generate
+
+        logging.info("Checking course availability...")
+        available_courses = {}
+        for course in courses:
+            available_sections = get_course_availability(driver, course)
+            if available_sections:
+                available_courses[course] = available_sections
+                logging.info(f"Course {course} is available:")
+                for crn, availability_type in available_sections:
+                    logging.info(f"  CRN: {crn}, Availability: {availability_type}")
+            else:
+                logging.info(f"Course {course} is not available")
+
+        if available_courses:
+            notification_title = "Course Availability Alert"
+            notification_body = "The following courses are available:\n"
+            for course, sections in available_courses.items():
+                notification_body += f"{course}:\n"
+                for crn, availability_type in sections:
+                    notification_body += f"  CRN: {crn}, Availability: {availability_type}\n"
+            send_notification(notification_title, notification_body)
         else:
-            logging.info(f"Course {course} is not available")
+            logging.info("No courses are currently available.")
 
-    if available_courses:
-        notification_title = "Course Availability Alert"
-        notification_body = "The following courses are available:\n"
-        for course, sections in available_courses.items():
-            notification_body += f"{course}:\n"
-            for crn, availability_type in sections:
-                notification_body += f"  CRN: {crn}, Availability: {availability_type}\n"
-        send_notification(notification_title, notification_body)
-    else:
-        logging.info("No courses are currently available.")
-
-    logging.info("All courses have been checked for availability.")
-
-    driver.quit()
+        logging.info("All courses have been checked for availability.")
+    except Exception as e:
+        logging.error(f"An error occurred during web task: {str(e)}")
+    finally:
+        driver.quit()
 
 if __name__ == "__main__":
     perform_web_task()
