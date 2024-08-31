@@ -21,17 +21,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
     
-    - name: Setup Chrome
-      uses: browser-actions/setup-chrome@latest
-      with:
-        chrome-version: stable
+    - name: Install specific Chrome version
+      run: |
+        wget -q -O chrome.deb https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_114.0.5735.198-1_amd64.deb
+        sudo apt install ./chrome.deb
+        google-chrome --version
     
     - name: Setup ChromeDriver
       run: |
         CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | awk -F. '{print $1}')
         echo "Chrome version: $CHROME_VERSION"
-        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE")
-        echo "Latest ChromeDriver version: $CHROMEDRIVER_VERSION"
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+        echo "ChromeDriver version: $CHROMEDRIVER_VERSION"
         wget -q -O chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
         unzip chromedriver.zip
         chmod +x chromedriver
