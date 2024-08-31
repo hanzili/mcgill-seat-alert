@@ -25,13 +25,17 @@ jobs:
       uses: browser-actions/setup-chrome@latest
     
     - name: Setup ChromeDriver
-      uses: nanasess/setup-chromedriver@master
+      run: |
+        CHROME_VERSION=$(google-chrome --version | cut -d " " -f3 | cut -d "." -f1)
+        CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
+        curl -L -o chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip"
+        unzip chromedriver.zip
+        chmod +x chromedriver
+        sudo mv chromedriver /usr/local/bin/
     
     - name: Run course check script
       env:
         PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
         PUSHOVER_API_TOKEN: ${{ secrets.PUSHOVER_API_TOKEN }}
       run: |
-        export DISPLAY=:99
-        chromedriver --url-base=/wd/hub &
         python register.py
