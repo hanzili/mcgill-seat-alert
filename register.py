@@ -1,7 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -15,7 +13,6 @@ import json
 import argparse
 import logging
 from requests.exceptions import RequestException
-from webdriver_manager.core.utils import ChromeType
 
 # Use environment variables for Pushover credentials
 PUSHOVER_USER_KEY = os.environ.get('PUSHOVER_USER_KEY')
@@ -86,19 +83,12 @@ def get_course_availability(driver, course):
         return []
 
 def setup_driver():
-    chrome_options = webdriver.ChromeOptions()
+    chrome_options = Options()
     chrome_options.add_argument('--headless')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     
-    try:
-        # Try to get the latest compatible ChromeDriver
-        service = Service(ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install())
-    except ValueError:
-        # If the latest version fails, try with an older known stable version
-        service = Service(ChromeDriverManager(version="114.0.5735.90").install())
-    
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 def perform_web_task():
